@@ -43,4 +43,37 @@ jobs:
             registry: quay.io/${{ secrets.QUAY_USERNAME }}
             username: ${{ secrets.QUAY_USERNAME }}
             password: ${{ secrets.QUAY_PASSWORD }}
+    
  
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      APP_NAME: "course-flask-demo"
+      
+    steps:
+    - name: Authenticate and set context
+      uses: redhat-actions/oc-login@v1
+      with:
+        # URL to your OpenShift cluster.
+        openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+
+        # Authentication Token. 
+        openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+        # Disables SSL cert checking. Use this if you don't have the certificate authority data.
+        insecure_skip_tls_verify: true
+        # This method is more secure, if the certificate from Step 4 is available.
+        # certificate_authority_data: ${{ secrets.CA_DATA }}
+
+        # Optional - this sets your Kubernetes context's current namespace after logging in.
+        namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+    - name: Create and expose app
+      run: |
+        oc delete deployment --all
+        oc delete routes --all
+        oc delete services --all
+        oc new-app --name ${{ env.APP_NAME }} --docker-image=quay.io/${{ secrets.QUAY_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        
+      
+  
+  
