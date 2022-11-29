@@ -52,8 +52,7 @@ jobs:
 
     env:
       APP_NAME: "course-flask-demo"
-      #OPENSHIFT_NAMESPACE: adeployer
-      OPENSHIFT_NAMESPACE: python-storage-claim
+      OPENSHIFT_NAMESPACE: adeployer
       APP_PORT: 8080
 
     steps:
