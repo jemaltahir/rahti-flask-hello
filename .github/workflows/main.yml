@@ -21,7 +21,7 @@ jobs:
         id: build-image
         uses: redhat-actions/buildah-build@v2
         with:
-          base-image: "registry.fedoraproject.org/f36/python3"
+          base-image: "registry.fedoraproject.org/f35/python3"
           image: my-flask-app
           tags: latest ${{ github.sha }}
           port: 8080
