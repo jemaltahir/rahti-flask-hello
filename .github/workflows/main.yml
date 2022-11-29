@@ -52,7 +52,8 @@ jobs:
 
     env:
       APP_NAME: "course-flask-demo"
-      OPENSHIFT_NAMESPACE: adeployer
+      #OPENSHIFT_NAMESPACE: adeployer
+      OPENSHIFT_NAMESPACE: python-storage-claim
       APP_PORT: 8080
 
     steps:
@@ -81,10 +82,8 @@ jobs:
       #     namespace: ${{ env.OPENSHIFT_NAMESPACE }}
       #     port: ${{ env.APP_PORT }}
 
-      #
-      # - name: Testing pod outputs
-      #   run: |
-      #     oc -n  ${{ env.OPENSHIFT_NAMESPACE }} get pods -owide
-      - name: Testing name of current project
+      - name: Testing pod outputs
         run: |
-          oc project
+          oc -n  ${{ env.OPENSHIFT_NAMESPACE }} get pods -owide
+          echo "----------------------"
+          oc get pods -owide
