@@ -77,7 +77,7 @@ jobs:
         uses: redhat-actions/oc-new-app@v1
         with:
           app_name: ${{ env.APP_NAME }}
-          image: quay.io/jemalmtahir/my-flask-app:e7ea3d1b5f3b1b358c725d39ccd2d46e00d7be81
+          image: quay.io/jemalmtahir/my-flask-app:latest
           namespace: ${{ env.OPENSHIFT_NAMESPACE }}
           port: ${{ env.APP_PORT }}
 
