@@ -1,12 +1,13 @@
 name: Build and Push Image
-on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
+on: [ workflow_dispatch]
+# on:
+#   push:
+#     branches: [master]
+#   pull_request:
+#     branches: [master]
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+#   # Allows you to run this workflow manually from the Actions tab
+#   workflow_dispatch:
 
 jobs:
   build-image:
@@ -24,7 +25,6 @@ jobs:
           base-image: "registry.fedoraproject.org/f35/python3"
           image: my-flask-app
           tags: latest ${{ github.sha }}
-          port: 8080
 
       - name: Push To Quay Action
         id: push-to-quay
@@ -41,3 +41,46 @@ jobs:
 
       - name: Print image url
         run: echo "Image pushed to ${{ steps.push-to-quay.outputs.registry-paths }}"
+
+  deploy:
+    needs: build-image
+    runs-on: ubuntu-latest
+
+    outputs:
+        ROUTE: ${{ steps.deploy-and-expose.outputs.route }}
+        SELECTOR: ${{ steps.deploy-and-expose.outputs.selector }}
+
+    env:
+      APP_NAME: "course-flask-demo"
+      OPENSHIFT_NAMESPACE: adeployer
+      APP_PORT: 8080
+
+    steps:
+      - name: Authenticate and set context
+        uses: redhat-actions/oc-login@v1
+        with:
+          # URL to your OpenShift cluster.
+          openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+
+          # Authentication Token. 
+          openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+          # Disables SSL cert checking. Use this if you don't have the certificate authority data.
+          insecure_skip_tls_verify: true
+          # This method is more secure, if the certificate from Step 4 is available.
+          # certificate_authority_data: ${{ secrets.CA_DATA }}
+
+          # Optional - this sets your Kubernetes context's current namespace after logging in.
+          namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+     
+      - name: Create and expose app
+        id: deploy-and-expose
+        uses: redhat-actions/oc-new-app@v1
+        with:
+          app_name: ${{ env.APP_NAME }}
+          image: ${{ steps.push-to-quay.outputs.registry-paths }}
+          namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+          port: ${{ env.APP_PORT }}
+
+       - name: Testing pod outputs
+        run: |
+          oc -n  ${{ env.OPENSHIFT_NAMESPACE }} get pods -owide
