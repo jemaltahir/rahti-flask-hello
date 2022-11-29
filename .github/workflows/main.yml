@@ -77,7 +77,7 @@ jobs:
         uses: redhat-actions/oc-new-app@v1
         with:
           app_name: ${{ env.APP_NAME }}
-          image: ${{ steps.push-to-quay.outputs.registry-paths }}
+          image: quay.io/jemalmtahir/my-flask-app:e7ea3d1b5f3b1b358c725d39ccd2d46e00d7be81
           namespace: ${{ env.OPENSHIFT_NAMESPACE }}
           port: ${{ env.APP_PORT }}
 
@@ -86,4 +86,3 @@ jobs:
           oc -n  ${{ env.OPENSHIFT_NAMESPACE }} get pods -owide
           echo "----------------------"
           oc get pods -owide
-          
