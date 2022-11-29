@@ -87,4 +87,4 @@ jobs:
       #     oc -n  ${{ env.OPENSHIFT_NAMESPACE }} get pods -owide
       - name: Testing name of current project
         run: |
-          oc oc project
+          oc project
