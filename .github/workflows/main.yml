@@ -81,6 +81,6 @@ jobs:
           namespace: ${{ env.OPENSHIFT_NAMESPACE }}
           port: ${{ env.APP_PORT }}
 
-       - name: Testing pod outputs
+      - name: Testing pod outputs
         run: |
           oc -n  ${{ env.OPENSHIFT_NAMESPACE }} get pods -owide
