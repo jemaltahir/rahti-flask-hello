@@ -8,15 +8,35 @@ on: [workflow_dispatch]
 
 #   # Allows you to run this workflow manually from the Actions tab
 #   workflow_dispatch:
+env:
+  IMAGE_PATH: quay.io/jemalmtahir/my-flask-app:latest
+  APP_NAME: flaskapp
+  APP_PORT: 8080
+  IMAGE_STREAM: ${{ secrets.OPENSHIFT_NAMESPACE }}/flaskapp-${{ github.run_id }}
+  OPENSHIFT_NAMESPACE: adeployer
+
+concurrency:
+  group: example-workflow
+  cancel-in-progress: false
 
 jobs:
-  build-image:
-    name: Build image without Containerfile
-    runs-on: ubuntu-latest
+  openshift-deploy:
+    name: Deploy to OpenShift
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        image-source: ["IMAGE_PATH", "IMAGE_STREAM"]
 
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout source
+      - name: Checkout action
         uses: actions/checkout@v3
+
+      # Use the commit short-sha as the suffix of the app_name
+      - name: Get commit short-sha
+        id: commit-data
+        uses: redhat-actions/common/commit-data@v1
 
       - name: Build Image
         id: build-image
@@ -39,50 +59,136 @@ jobs:
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
-      - name: Print image url
-        run: echo "Image pushed to ${{ steps.push-to-quay.outputs.registry-paths }}"
-
-  deploy:
-    needs: build-image
-    runs-on: ubuntu-latest
-
-    outputs:
-      ROUTE: ${{ steps.deploy-and-expose.outputs.route }}
-      SELECTOR: ${{ steps.deploy-and-expose.outputs.selector }}
-
-    env:
-      APP_NAME: "course-flask-demo"
-      OPENSHIFT_NAMESPACE: adeployer
-      APP_PORT: 8080
-
-    steps:
-      - name: Authenticate and set context
+      - name: OpenShift login
         uses: redhat-actions/oc-login@v1
         with:
-          # URL to your OpenShift cluster.
           openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
-
-          # Authentication Token.
           openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
-          # Disables SSL cert checking. Use this if you don't have the certificate authority data.
           insecure_skip_tls_verify: true
-          # This method is more secure, if the certificate from Step 4 is available.
-          # certificate_authority_data: ${{ secrets.CA_DATA }}
+          namespace: ${{ secrets.OPENSHIFT_NAMESPACE }}
 
-          # Optional - this sets your Kubernetes context's current namespace after logging in.
-          namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+      - name: Create Image stream from the image
+        if: ${{ matrix.image-source == 'IMAGE_STREAM' }}
+        run: |
+          oc create is ${{ env.APP_NAME }}-${{ github.run_id }}
+          oc import-image ${{ env.APP_NAME }}-${{ github.run_id }} --from ${{ env.IMAGE_PATH }}
 
+      # This step will create a deployment, service, and route to run your app and expose it to the internet.
       - name: Create and expose app
-        id: deploy-and-expose
-        uses: redhat-actions/oc-new-app@v1
+        id: oc-new-app
+        # uses: redhat-actions/oc-new-app@v1 Test the checked-out version of this action - a user would need the above 'uses'.
+        uses: ./
+        env:
+          IMAGE: ${{ env[matrix.image-source] }}
         with:
-          app_name: ${{ env.APP_NAME }}
-          image: quay.io/jemalmtahir/my-flask-app:latest
-          namespace: ${{ env.OPENSHIFT_NAMESPACE }}
-          port: ${{ env.APP_PORT }}
+          app_name: ${{ env.APP_NAME }}-${{ steps.commit-data.outputs.short_sha }}
+          image: ${{ env.IMAGE }}
+          namespace: ${{ secrets.OPENSHIFT_NAMESPACE }}
+          build_env: |
+            MY_ENV=MY_VALUE
+          # port: ${{ env.APP_PORT }}
+          # create_pull_secret_from: podman
+          # registry: quay.io
+          # registry_username: ${{ env.REGISTRY_USERNAME }}
+          # registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Echo outputs
+        run: |
+          echo "${{ toJSON(steps.oc-new-app.outputs) }}"
+
+        # Perform a (very) basic integration test.
+      # This step is retried since the time to pull the image and start the pod can vary.
+      - name: Test project is running
+        id: test-project
+        uses: nick-invision/retry@v2.2.0
+        with:
+          timeout_seconds: 3
+          retry_wait_seconds: 10
+          max_attempts: 30
+          warning_on_retry: false
+          # Just check that the root endpoint returns a success status (-f flag).
+          command: curl -sSfLi ${{ steps.oc-new-app.outputs.route }}
 
       - name: Testing pod outputs
         run: |
           oc -n  ${{ env.OPENSHIFT_NAMESPACE }} get pods -owide
           echo "----------------------"
           oc get pods -owide
+
+# jobs:
+#   build-image:
+#     name: Build image without Containerfile
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout source
+#         uses: actions/checkout@v3
+
+#       - name: Build Image
+#         id: build-image
+#         uses: redhat-actions/buildah-build@v2
+#         with:
+#           base-image: "registry.fedoraproject.org/f35/python3"
+#           image: my-flask-app
+#           tags: latest ${{ github.sha }}
+
+#       - name: Push To Quay Action
+#         id: push-to-quay
+#         uses: redhat-actions/push-to-registry@v2
+#         if: >
+#           (github.event_name == 'push' || github.event_name == 'schedule') &&
+#           (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+#         with:
+#           image: ${{ steps.build-image.outputs.image }}
+#           tags: ${{ steps.build-image.outputs.tags }}
+#           registry: quay.io/${{ secrets.QUAY_USERNAME }}
+#           username: ${{ secrets.QUAY_USERNAME }}
+#           password: ${{ secrets.QUAY_PASSWORD }}
+
+#       - name: Print image url
+#         run: echo "Image pushed to ${{ steps.push-to-quay.outputs.registry-paths }}"
+
+#   deploy:
+#     needs: build-image
+#     runs-on: ubuntu-latest
+
+#     outputs:
+#       ROUTE: ${{ steps.deploy-and-expose.outputs.route }}
+#       SELECTOR: ${{ steps.deploy-and-expose.outputs.selector }}
+
+#     env:
+#       APP_NAME: "course-flask-demo"
+#       OPENSHIFT_NAMESPACE: adeployer
+#       APP_PORT: 8080
+
+#     steps:
+#       - name: Authenticate and set context
+#         uses: redhat-actions/oc-login@v1
+#         with:
+#           # URL to your OpenShift cluster.
+#           openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+
+#           # Authentication Token.
+#           openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+#           # Disables SSL cert checking. Use this if you don't have the certificate authority data.
+#           insecure_skip_tls_verify: true
+#           # This method is more secure, if the certificate from Step 4 is available.
+#           # certificate_authority_data: ${{ secrets.CA_DATA }}
+
+#           # Optional - this sets your Kubernetes context's current namespace after logging in.
+#           namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+
+#       - name: Create and expose app
+#         id: deploy-and-expose
+#         uses: redhat-actions/oc-new-app@v1
+#         with:
+#           app_name: ${{ env.APP_NAME }}
+#           image: quay.io/jemalmtahir/my-flask-app:latest
+#           namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+#           port: ${{ env.APP_PORT }}
+
+#       - name: Testing pod outputs
+#         run: |
+#           oc -n  ${{ env.OPENSHIFT_NAMESPACE }} get pods -owide
+#           echo "----------------------"
+#           oc get pods -owide
