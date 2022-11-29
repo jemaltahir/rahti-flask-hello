@@ -72,17 +72,18 @@ jobs:
           # Optional - this sets your Kubernetes context's current namespace after logging in.
           namespace: ${{ env.OPENSHIFT_NAMESPACE }}
 
-      # - name: Create and expose app
-      #   id: deploy-and-expose
-      #   uses: redhat-actions/oc-new-app@v1
-      #   with:
-      #     app_name: ${{ env.APP_NAME }}
-      #     image: ${{ steps.push-to-quay.outputs.registry-paths }}
-      #     namespace: ${{ env.OPENSHIFT_NAMESPACE }}
-      #     port: ${{ env.APP_PORT }}
+      - name: Create and expose app
+        id: deploy-and-expose
+        uses: redhat-actions/oc-new-app@v1
+        with:
+          app_name: ${{ env.APP_NAME }}
+          image: ${{ steps.push-to-quay.outputs.registry-paths }}
+          namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+          port: ${{ env.APP_PORT }}
 
       - name: Testing pod outputs
         run: |
           oc -n  ${{ env.OPENSHIFT_NAMESPACE }} get pods -owide
           echo "----------------------"
           oc get pods -owide
+          
