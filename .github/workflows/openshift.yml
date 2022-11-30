@@ -16,7 +16,7 @@ jobs:
         id: build_image
         env:
           IMAGE_NAME: flask-app
-          TAGS: v1 ${{ github.sha }}
+          TAGS: latest ${{ github.sha }}
         uses: redhat-actions/s2i-build@v2
         with:
           path_context: "."
@@ -61,7 +61,7 @@ jobs:
           OPENSHIFT_NAMESPACE: adeployer
         with:
           app_name: ${{ env.APP_NAME }}
-          image: ${{ env.IMAGE }}
+          image: quay.io/${{ secrets.QUAY_USERNAME }}/${{ env.IMAGE_NAME}}:latest
           namespace: ${{ env.OPENSHIFT_NAMESPACE }}
 
       - name: Echo outputs
