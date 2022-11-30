@@ -3,7 +3,7 @@ on: [workflow_dispatch]
 
 jobs:
   build:
-    name: Deploy
+    name: Build
     runs-on: ubuntu-latest
     environment: dev
 
@@ -34,3 +34,42 @@ jobs:
           registry: quay.io/${{ secrets.QUAY_USERNAME }}
           username: ${{ secrets.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_PASSWORD }}
+
+  deploy:
+    needs: build
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout action
+        uses: actions/checkout@v3
+
+      - name: OpenShift login
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+          openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+          namespace: ${{ secrets.OPENSHIFT_NAMESPACE }}
+          insecure_skip_tls_verify: true
+
+      - name: Create and expose app
+        id: oc-new-app
+        uses: redhat-actions/oc-new-app@v1
+        env:
+          IMAGE_NAME: flask-app
+          OPENSHIFT_NAMESPACE: adeployer
+        with:
+          app_name: ${{ env.APP_NAME }}
+          image: ${{ env.IMAGE }}
+          namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+
+      - name: Echo outputs
+        run: |
+          echo "${{ toJSON(steps.oc-new-app.outputs) }}"
+
+      - name: Testing pod outputs
+        run: |
+          oc -n  ${{ env.OPENSHIFT_NAMESPACE }} get pods -owide
+          echo "----------------------"
+          oc get pods -owide
