@@ -1,6 +1,11 @@
 name: Build and Push Image
 on: [workflow_dispatch]
 
+env:
+  IMAGE_PATH: quay.io/jemalmtahir/flask-app:latest
+  APP_NAME: flask-app
+  APP_PORT: 8080
+  IMAGE_STREAM: ${{ secrets.OPENSHIFT_NAMESPACE }}/petclinic-${{ github.run_id }}
 jobs:
   build:
     name: Build
@@ -15,7 +20,7 @@ jobs:
       - name: Setup and Build
         id: build_image
         env:
-          IMAGE_NAME: flask-app
+          IMAGE_NAME: ${{ env.APP_NAME}}
           TAGS: latest ${{ github.sha }}
         uses: redhat-actions/s2i-build@v2
         with:
@@ -57,12 +62,16 @@ jobs:
         id: oc-new-app
         uses: redhat-actions/oc-new-app@v1
         env:
-          IMAGE_NAME: flask-app
           OPENSHIFT_NAMESPACE: adeployer
         with:
           app_name: ${{ env.APP_NAME }}
-          image: quay.io/${{ secrets.QUAY_USERNAME }}/${{ env.IMAGE_NAME}}:latest
+          image: ${{ env.IMAGE_PATH }}
           namespace: ${{ env.OPENSHIFT_NAMESPACE }}
+          port: ${{ env.APP_PORT }}
+          create_pull_secret_from: podman
+          registry: quay.io
+          registry_username: ${{ secrets.QUAY_USERNAM }}
+          registry_password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Echo outputs
         run: |
