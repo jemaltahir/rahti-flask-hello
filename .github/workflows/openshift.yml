@@ -68,10 +68,6 @@ jobs:
           image: ${{ env.IMAGE_PATH }}
           namespace: ${{ env.OPENSHIFT_NAMESPACE }}
           port: ${{ env.APP_PORT }}
-          create_pull_secret_from: podman
-          registry: quay.io
-          registry_username: ${{ secrets.QUAY_USERNAM }}
-          registry_password: ${{ secrets.QUAY_PASSWORD }}
 
       - name: Echo outputs
         run: |
